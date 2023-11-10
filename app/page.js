@@ -1,14 +1,23 @@
 'use client';
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import SpinnerButton from "./components/button";
 import NetworkResult from "./components/networkResult";
 import { GetJsonFetcher, IsErrorResponse } from "./utils";
+import { useSearchParams } from "next/navigation";
 
 export default function Home() {
+  const searchParams = useSearchParams();
   const [pending, setPending] = useState(false);
   const [wallet, setWallet] = useState('');
   const [result, setResult] = useState({});
+
+  useEffect(() => {
+    const maybeWallet = searchParams.get('wallet');
+    if (maybeWallet) {
+      setWallet(maybeWallet);
+    }
+  }, []);
 
   const onChange = event => setWallet(event.target.value);
 
