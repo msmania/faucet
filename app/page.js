@@ -1,33 +1,39 @@
 'use client';
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import SpinnerButton from "./components/button";
 import NetworkResult from "./components/networkResult";
-import { GetJsonFetcher, IsErrorResponse } from "./utils";
+import { FetchJson, IsErrorResponse } from "./utils";
 import { useSearchParams } from "next/navigation";
 
 export default function Home() {
   const searchParams = useSearchParams();
   const [pending, setPending] = useState(false);
   const [wallet, setWallet] = useState('');
+  const [amount, setAmount] = useState(0);
   const [result, setResult] = useState({});
 
   useEffect(() => {
+    async function useEffectAsync() {
+      const amountNew = await FetchJson('/api', ['amount']);
+      setAmount(parseInt(amountNew));
+    }
+
     const maybeWallet = searchParams.get('wallet');
     if (maybeWallet) {
       setWallet(maybeWallet);
     }
+
+    useEffectAsync();
   }, []);
 
-  const onChange = event => setWallet(event.target.value);
+  const onChange = useCallback(event => setWallet(event.target.value), []);
 
-  const onClick = async event => {
+  const onClick = useCallback(async event => {
     setPending(true);
     event.preventDefault();
-
     try {
-      const fetcher = GetJsonFetcher('no-cache', () => ['send', wallet]);
-      const txHash = await fetcher('/api');
+      const txHash = await FetchJson('/api', ['send', wallet]);
       if (IsErrorResponse(txHash)) {
         const err = new Error();
         err.message = txHash.message;
@@ -42,7 +48,7 @@ export default function Home() {
     finally {
       setPending(false);
     }
-  };
+  }, [wallet]);
 
   return (
     <main className="flex min-h-screen flex-col items-center p-24">
@@ -63,7 +69,8 @@ export default function Home() {
       <div className="flex flex-row justify-center mb-2">
         <SpinnerButton
           type="button"
-          label="Get 1 Token"
+          className={amount ? "" : "hidden"}
+          label={`Get ${amount} Token`}
           labelPending="Requesting..."
           isPending={pending}
           onClick={onClick}
