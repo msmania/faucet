@@ -1,21 +1,24 @@
 'use client';
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, Suspense } from "react";
 import SpinnerButton from "./components/button";
 import NetworkResult from "./components/networkResult";
 import { FetchJson, IsErrorResponse } from "./utils";
 import { useSearchParams } from "next/navigation";
 
-export default function Home() {
+function Core() {
   const searchParams = useSearchParams();
   const [pending, setPending] = useState(false);
   const [wallet, setWallet] = useState('');
   const [amount, setAmount] = useState(0);
   const [result, setResult] = useState({});
 
+  const maybeNetwork = searchParams.get('network');
+  const apiPath = maybeNetwork ? '/api?network=' + maybeNetwork : '/api';
+
   useEffect(() => {
     async function useEffectAsync() {
-      const amountNew = await FetchJson('/api', ['amount']);
+      const amountNew = await FetchJson(apiPath, ['amount']);
       setAmount(parseInt(amountNew));
     }
 
@@ -33,7 +36,7 @@ export default function Home() {
     setPending(true);
     event.preventDefault();
     try {
-      const txHash = await FetchJson('/api', ['send', wallet]);
+      const txHash = await FetchJson(apiPath, ['send', wallet]);
       if (IsErrorResponse(txHash)) {
         const err = new Error();
         err.message = txHash.message;
@@ -78,5 +81,13 @@ export default function Home() {
       </div>
       <NetworkResult result={result} />
     </main>
+  )
+}
+
+export default function Home() {
+  return (
+    <Suspense>
+      <Core />
+    </Suspense>
   )
 }

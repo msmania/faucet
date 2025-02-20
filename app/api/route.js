@@ -1,12 +1,11 @@
 import { ethers, parseEther } from "ethers";
 import { LRUCache } from 'lru-cache';
 
-const Provider = new ethers.JsonRpcProvider(process.env.ENDPOINT);
 const Signers = [
-  new ethers.Wallet(process.env.SIGNER1_KEY, Provider),
-  new ethers.Wallet(process.env.SIGNER2_KEY, Provider),
-  new ethers.Wallet(process.env.SIGNER3_KEY, Provider),
-  new ethers.Wallet(process.env.SIGNER4_KEY, Provider),
+  new ethers.Wallet(process.env.SIGNER1_KEY),
+  new ethers.Wallet(process.env.SIGNER2_KEY),
+  new ethers.Wallet(process.env.SIGNER3_KEY),
+  new ethers.Wallet(process.env.SIGNER4_KEY),
 ];
 
 const WalletCache = new LRUCache({
@@ -30,7 +29,10 @@ function normalizeWallet(wallet) {
   return wallet;
 }
 
-async function getToken(sendTo) {
+async function getToken({sendTo, network}) {
+  const endpoint = network == 'dev2'
+  ? process.env.ENDPOINT_DEV2
+  : process.env.ENDPOINT;
   const normalized = normalizeWallet(sendTo);
   if (WalletCache.get(normalized)) {
     throw new Error(
@@ -38,16 +40,17 @@ async function getToken(sendTo) {
     );
   }
 
-  const gas = await Provider.send("eth_gasPrice", []);
-
+  const provider = new ethers.JsonRpcProvider(endpoint);
+  const gas = await provider.send("eth_gasPrice", []);
   const r = Math.floor(Math.random() * Signers.length)
+  const signer = Signers[r].connect(provider);
   const tx = {
-    from: Signers[r].address,
+    from: signer.address,
     to: sendTo,
     value: parseEther(process.env.AMOUNT),
     gasPrice: gas,
   };
-  const txResult = await Signers[r].sendTransaction(tx);
+  const txResult = await signer.sendTransaction(tx);
   await txResult.wait();
 
   WalletCache.set(normalized, 1);
@@ -56,13 +59,16 @@ async function getToken(sendTo) {
 }
 
 export async function POST(req) {
+  const searchParams = req.nextUrl.searchParams;
+  const network = searchParams.get('network');
+
   try {
     const args = await req.json();
 
     let ret = null;
     switch (args[0]) {
     case 'send':
-      ret = await getToken(args[1]);
+      ret = await getToken({sendTo: args[1], network});
       break;
     case 'amount':
       ret = process.env.AMOUNT;
